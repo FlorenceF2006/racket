@@ -35,7 +35,7 @@
        (define op (op-trans op))
        (define opd1 (eval-h exp1))
        (define opd2 (eval-h exp2))
-       (define pys (get-sym ptr))
+       (define pys (get-sym stk-ptr))
        (add-inst (list op pys opd1 opd2) acc)
        (add-inst (list 'data pys 0) mem)
        (set! stk-ptr (+ stk-ptr 1))
@@ -48,6 +48,7 @@
   (set! mem (second (prog)))
   (set! prog (rest (rest prog)))
   (define (compile-h prog)
+    (if (empty? prog) void
     (match (first prog)
       [`(print ,exp)
        (cond[(string? exp)
@@ -77,12 +78,12 @@
       [`(skip) void]
       [_
        (cond[(equal? (first (first prog)) 'seq)
-             (compile-h (rest (first porg)))]
+             (compile-h (rest (first prog)))]
             [else
-             (define (first prog) loop)
-             (define (rest prog) bdy)
+             (define loop (first prog))
+             (define bdy (rest prog))
              (set! bdy (cons 'seq bdy))
-             (define (second loop) bexp)
+             (define bexp (second loop))
              (define bs (eval-bexp bexp))
              (define top (get-sym stk-ptr))
              (set! stk-ptr (+ stk-ptr))
@@ -97,6 +98,10 @@
              (compile-h bdy)
              (add-inst (list 'jump top) acc)
              (add-inst (list 'label fl))])])))
+  (compile-h prog)
+  (append acc '((halt)) mem)
+  )
+
        
        
        
