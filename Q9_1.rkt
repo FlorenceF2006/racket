@@ -14,6 +14,7 @@
 ;;
 ;;assume we have a global counter : stk-ptr
 (define stk-ptr 0)
+(define acc empty)
 ;;assume we have a global accumulative data storage mem
 (define mem empty)
 ;;get-sym returns the pysmbol with stk-ptr
@@ -23,12 +24,8 @@
 (define (add-inst inst s)
     (set! s (append s (list inst))))
 
-;;what should it return?
-;;should it return a struct?
-;;or a list? I think it should return a list.
-;;we need a list of temporary data we can constantly cons.
+;;(eval-aexp) will return a pysymbol representing the results of evaluation.
 (define (eval-aexp exp)
-  (define acc empty)
   ;;eval-h returns a pysymbol
   (define (eval-h exp)
     (match exp
@@ -43,7 +40,7 @@
        pys]
       [x x]))
   (eval-h exp)
-  acc)
+)
 
 
 
