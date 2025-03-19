@@ -1,3 +1,2 @@
-hello
-world 
-something
+#lang racket
+
