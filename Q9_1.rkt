@@ -117,9 +117,12 @@
       [false 0]))
   (eval-h exp))
 
+(define (convert-data lst)
+  (cond[(empty? lst) empty]
+       [else (cons (cons 'data (first lst)) (convert-data (rest lst)))]))
 
 (define (compile prog)
-  (set-box! mem (second prog))
+  (set-box! mem (convert-data (second prog)))
   (set! prog (rest (rest prog)))
   (define (compile-h prog)
     (cond[ (empty? prog) void]
@@ -157,7 +160,6 @@
              (define loop (first prog))
              (define bdy (rest (rest (first prog))))
              (define bexp (second loop))
-             (define bs (eval-bexp bexp))
              (define top (get-sym stk-ptr))
              (set! stk-ptr (+ 1 stk-ptr))
              (define tl (get-sym stk-ptr))
@@ -165,6 +167,7 @@
              (define fl (get-sym stk-ptr))
              (set! stk-ptr (+ 1 stk-ptr))
              (add-inst (list 'label top) acc)
+             (define bs (eval-bexp bexp))
              (add-inst (list 'branch bs tl) acc)
              (add-inst (list 'jump fl) acc)
              (add-inst (list 'label tl) acc)
