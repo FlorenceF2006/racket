@@ -7,7 +7,14 @@
     ['- 'sub]
     ['div 'div]
     ['mod 'mod]
-    
+    ['= eq]
+    ['> 'gt]
+    ['< 'lt]
+    ['>= 'ge]
+    ['<= 'le]
+    ['not 'lnot]
+    ['and 'land]
+    ['or 'lor]
     ))
 ;;
 ;;assume we have a global counter : stk-ptr
@@ -17,6 +24,8 @@
 ;;get-sym returns the pysmbol with stk-ptr
 (define (get-sym ptr)
   (+ '_' (number->symbol ptr)))
+
+// can you use + to coonect two symbols?
 
 (define (add-inst inst s)
     (set! s (append s (list inst))))
@@ -43,6 +52,68 @@
       [x x]))
   (eval-h exp)
   )
+
+(define (eval-bexp exp)
+  ;;eval-h: return a pysymbol
+  (define (delete-srd lst)
+    (cons (first lst) (rest (rest lst))))
+  (define (eval-h exp)
+    (match exp
+      [`(and ,bexp1 ,bexp2)
+       (define op (op-trans 'and))
+       (define val1 (eval-bexp bexp1))
+       (define val2 (eval-bexp bexp2))
+       (define pys (get-sym stk-ptr))
+       (add-inst (list op pys val1 val2) acc) 
+       (add-inst (list 'data pys 0) mem)
+       (set! stk-ptr (+ stk-ptr 1))
+       pys]
+      [`(or ,bexp1 ,bexp2)
+       (define op (op-trans 'and))
+       (define val1 (eval-bexp bexp1))
+       (define val2 (eval-bexp bexp2))
+       (define pys (get-sym stk-ptr))
+       (add-inst (list op pys val1 val2) acc) 
+       (add-inst (list 'data pys 0) mem)
+       (set! stk-ptr (+ stk-ptr 1))
+       pys]
+      [`(and ,bexp1 ...)
+       (define val1 (eval-bexp bexp1))
+       (define val2 (eval-bexp (delete-second exp)))
+       (define op (op-trans 'and))
+       (define pys (get-sym stk-ptr))
+       (add-inst (list op pys val1 val2) acc) 
+       (add-inst (list 'data pys 0) mem)
+       (set! stk-ptr (+ stk-ptr 1))
+       pys]
+      [`(or ,bexp1 ...)
+       (define val1 (eval-bexp bexp1))
+       (define val2 (eval-bexp (delete-second exp)))
+       (define op (op-trans 'and))
+       (define pys (get-sym stk-ptr))
+       (add-inst (list op pys val1 val2) acc) 
+       (add-inst (list 'data pys 0) mem)
+       (set! stk-ptr (+ stk-ptr 1))
+       pys]
+      [`(,op ,aexp1 ,aexp2)
+       (define op (op-trans op))
+       (define val1 (eval-aexp aexp1))
+       (define val2 (eval-aexp aexp2))
+       (define pys (get-sym stk-ptr))
+       (add-inst (list op pys val1 val2) acc) 
+       (add-inst (list 'data pys 0) mem)
+       (set! stk-ptr (+ stk-ptr 1))
+       pys]
+      [`(not ,bexp)
+       (define op (op-trans 'not))
+       (define val (eval-bexp bexp))
+       (define pys (get-sym stk-ptr))
+       (add-inst (list op psy val) acc)
+       (add-inst (list 'data pys 0) mem)
+       (set! stk-ptr (+ stk-ptr 1))
+       pys]
+      [true 1]
+      [false 0])))
 
 (define (compile prog)
   (set! mem (second (prog)))
