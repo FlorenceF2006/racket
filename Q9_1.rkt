@@ -159,7 +159,7 @@
              (define bexp (second loop))
              (define bs (eval-bexp bexp))
              (define top (get-sym stk-ptr))
-             (set! stk-ptr (+ stk-ptr))
+             (set! stk-ptr (+ 1 stk-ptr))
              (define tl (get-sym stk-ptr))
              (set! stk-ptr (+ 1 stk-ptr))
              (define fl (get-sym stk-ptr))
