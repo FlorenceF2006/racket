@@ -79,7 +79,7 @@
        pys]
       [`(and ,bexp1 ...)
        (define val1 (eval-bexp bexp1))
-       (define val2 (eval-bexp (delete-second exp)))
+       (define val2 (eval-bexp (delete-srd exp)))
        (define op (op-trans 'and))
        (define pys (get-sym stk-ptr))
        (add-inst (list op pys val1 val2) acc) 
@@ -88,7 +88,7 @@
        pys]
       [`(or ,bexp1 ...)
        (define val1 (eval-bexp bexp1))
-       (define val2 (eval-bexp (delete-second exp)))
+       (define val2 (eval-bexp (delete-srd exp)))
        (define op (op-trans 'and))
        (define pys (get-sym stk-ptr))
        (add-inst (list op pys val1 val2) acc) 
@@ -108,12 +108,14 @@
        (define op (op-trans 'not))
        (define val (eval-bexp bexp))
        (define pys (get-sym stk-ptr))
-       (add-inst (list op psy val) acc)
+       (add-inst (list op pys val) acc)
        (add-inst (list 'data pys 0) mem)
        (set! stk-ptr (+ stk-ptr 1))
        pys]
       [true 1]
-      [false 0])))
+      [false 0]))
+  (eval-h exp))
+
 
 (define (compile prog)
   (set! mem (second (prog)))
