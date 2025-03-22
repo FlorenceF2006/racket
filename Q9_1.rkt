@@ -1,5 +1,6 @@
 #lang racket
 
+
 (define (op-trans op)
   (match op
     ['+ 'add]
@@ -7,7 +8,7 @@
     ['- 'sub]
     ['div 'div]
     ['mod 'mod]
-    ['= eq]
+    ['= 'eq]
     ['> 'gt]
     ['< 'lt]
     ['>= 'ge]
@@ -20,17 +21,17 @@
 ;;assume we have a global counter : stk-ptr
 (define stk-ptr 0)
 ;;assume we have a global accumulative data storage mem
-(define mem empty)
+(define mem (box empty))
 ;;get-sym returns the pysmbol with stk-ptr
 (define (get-sym ptr)
   (+ '_' (number->symbol ptr)))
 
-// can you use + to coonect two symbols?
+;; can you use + to coonect two symbols?
 
 (define (add-inst inst s)
-    (set! s (append s (list inst))))
+    (set-box! s (append (unbox s) (list inst))))
 
-(define acc empty)
+(define acc (box empty))
 
 ;;what should it return?
 ;;should it return a struct?
@@ -118,17 +119,17 @@
 
 
 (define (compile prog)
-  (set! mem (second (prog)))
+  (set-box! mem (second prog))
   (set! prog (rest (rest prog)))
   (define (compile-h prog)
-    (if (empty? prog) void
-    (match (first prog)
+    (cond[ (empty? prog) void]
+    [else (match (first prog)
       [`(print ,exp)
        (cond[(string? exp)
-             (add-inst (list 'print-string exp))]
+             (add-inst (list 'print-string exp) acc)]
             [else
              (define pys (eval-aexp exp))
-             (add-inst (list 'print-val pys))])]
+             (add-inst (list 'print-val pys) acc)])]
       [`(set ,id ,aexp)
        (define pys (eval-aexp exp))
        (add-inst (list 'move id pys) acc)]
@@ -170,9 +171,11 @@
              (add-inst (list 'label tl) acc)
              (compile-h bdy)
              (add-inst (list 'jump top) acc)
-             (add-inst (list 'label fl))])])))
+             (add-inst (list 'label fl))])])
+    (compile-h (rest prog))]
+    ))
   (compile-h prog)
-  (append acc '((halt)) mem)
+  (append (unbox acc) '((halt)) (unbox mem))
   )
 
        
