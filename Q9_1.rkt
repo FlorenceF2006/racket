@@ -151,12 +151,11 @@
        (add-inst (list 'label nl) acc)]
       [`(skip) void]
       [_
-       (cond[(equal? (first (first prog)) 'seq)
+       (cond[(equal? (and (list? (first prog)) (first (first prog))) 'seq)
              (compile-h (rest (first prog)))]
             [else
              (define loop (first prog))
-             (define bdy (rest prog))
-             (set! bdy (cons 'seq bdy))
+             (define bdy (rest (rest prog)))
              (define bexp (second loop))
              (define bs (eval-bexp bexp))
              (define top (get-sym stk-ptr))
@@ -171,7 +170,7 @@
              (add-inst (list 'label tl) acc)
              (compile-h bdy)
              (add-inst (list 'jump top) acc)
-             (add-inst (list 'label fl))])])
+             (add-inst (list 'label fl) acc)])])
     (compile-h (rest prog))]
     ))
   (compile-h prog)
