@@ -41,8 +41,8 @@
   ;;eval-h returns a pysymbol
   (define (eval-h exp)
     (match exp
-      [`(,op ,exp1 ,exp2)
-       (define op (op-trans op))
+      [`(,ops ,exp1 ,exp2)
+       (define op (op-trans ops))
        (define opd1 (eval-h exp1))
        (define opd2 (eval-h exp2))
        (define pys (get-sym stk-ptr))
@@ -131,7 +131,7 @@
              (define pys (eval-aexp exp))
              (add-inst (list 'print-val pys) acc)])]
       [`(set ,id ,aexp)
-       (define pys (eval-aexp exp))
+       (define pys (eval-aexp aexp))
        (add-inst (list 'move id pys) acc)]
       [`(iif ,bexp ,stmt1 ,stmt2)
        (define bs (eval-bexp bexp))
@@ -155,7 +155,7 @@
              (compile-h (rest (first prog)))]
             [else
              (define loop (first prog))
-             (define bdy (rest (rest prog)))
+             (define bdy (rest (rest (first prog))))
              (define bexp (second loop))
              (define bs (eval-bexp bexp))
              (define top (get-sym stk-ptr))
