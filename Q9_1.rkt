@@ -8,7 +8,7 @@
     ['- 'sub]
     ['div 'div]
     ['mod 'mod]
-    ['= 'eq]
+    ['= 'equal]
     ['> 'gt]
     ['< 'lt]
     ['>= 'ge]
@@ -126,7 +126,8 @@
   (set! prog (rest (rest prog)))
   (define (compile-h prog)
     (cond[ (empty? prog) void]
-    [else (match (first prog)
+    [else
+     (match (first prog)
       [`(print ,exp)
        (cond[(string? exp)
              (add-inst (list 'print-string exp) acc)]
@@ -145,20 +146,21 @@
        (add-inst (list 'branch bs tl) acc)
        (add-inst (list 'jump fl) acc)
        (add-inst (list 'label tl) acc)
-       (compile-h stmt1)
+       (compile-h (list stmt1))
        (define nl (get-sym stk-ptr))
        (set! stk-ptr (+ stk-ptr 1))
        (add-inst (list 'jump nl) acc)
        (add-inst (list 'label fl) acc)
-       (compile-h stmt2)
+       (compile-h (list stmt2))
        (add-inst (list 'label nl) acc)]
       [`(skip) void]
       [_
-       (cond[(equal? (and (list? (first prog)) (first (first prog))) 'seq)
+
+       (cond[(equal? (first (first prog)) 'seq)
              (compile-h (rest (first prog)))]
             [else
              (define loop (first prog))
-             (define bdy (rest (rest (first prog))))
+             (define bdy (rest (rest loop)))
              (define bexp (second loop))
              (define top (get-sym stk-ptr))
              (set! stk-ptr (+ 1 stk-ptr))
