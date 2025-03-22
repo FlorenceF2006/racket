@@ -98,7 +98,7 @@
                    (convert-data (rest lst)))
                     ]))
 
-(define (compile prog)
+(define (compile-simpl prog)
   (set-box! mem (convert-data (second prog)))
   (set! prog (rest (rest prog)))
   (define (compile-h prog)
