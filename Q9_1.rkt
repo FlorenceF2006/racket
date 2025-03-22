@@ -24,7 +24,7 @@
 (define mem (box empty))
 ;;get-sym returns the pysmbol with stk-ptr
 (define (get-sym ptr)
-  (+ '_' (number->symbol ptr)))
+  (string->symbol (string-append "_" (number->string ptr))))
 
 ;; can you use + to coonect two symbols?
 
@@ -96,8 +96,8 @@
        (add-inst (list 'data pys 0) mem)
        (set! stk-ptr (+ stk-ptr 1))
        pys]
-      [`(,op ,aexp1 ,aexp2)
-       (define op (op-trans op))
+      [`(,ops ,aexp1 ,aexp2)
+       (define op (op-trans ops))
        (define val1 (eval-aexp aexp1))
        (define val2 (eval-aexp aexp2))
        (define pys (get-sym stk-ptr))
