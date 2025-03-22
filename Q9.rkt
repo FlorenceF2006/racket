@@ -1,6 +1,8 @@
+;;Fee Chen, Florence Fan
 #lang racket
 
-
+(define (compile-simpl program)
+  
 (define (op-trans op)
   (match op
     ['+ 'add]
@@ -98,7 +100,7 @@
                    (convert-data (rest lst)))
                     ]))
 
-(define (compile-simpl prog)
+(define (compile prog)
   (set-box! mem (convert-data (second prog)))
   (set! prog (rest (rest prog)))
   (define (compile-h prog)
@@ -158,7 +160,8 @@
   (compile-h prog)
   (append (unbox acc) '((halt)) (unbox mem))
   )
-
+(compile program)
+)
        
        
        
