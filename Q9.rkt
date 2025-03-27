@@ -133,28 +133,26 @@
        (compile-h (list stmt2))
        (add-inst (list 'label nl) acc)]
       [`(skip) void]
-      [_
-
-       (cond[(equal? (first (first prog)) 'seq)
-             (compile-h (rest (first prog)))]
-            [else
-             (define loop (first prog))
-             (define bdy (rest (rest loop)))
-             (define bexp (second loop))
-             (define top (get-sym stk-ptr))
-             (set! stk-ptr (+ 1 stk-ptr))
-             (define tl (get-sym stk-ptr))
-             (set! stk-ptr (+ 1 stk-ptr))
-             (define fl (get-sym stk-ptr))
-             (set! stk-ptr (+ 1 stk-ptr))
-             (add-inst (list 'label top) acc)
-             (define bs (eval-bexp bexp))
-             (add-inst (list 'branch bs tl) acc)
-             (add-inst (list 'jump fl) acc)
-             (add-inst (list 'label tl) acc)
-             (compile-h bdy)
-             (add-inst (list 'jump top) acc)
-             (add-inst (list 'label fl) acc)])])
+      [`(while ...)
+       (define loop (first prog))
+       (define bdy (rest (rest loop)))
+       (define bexp (second loop))
+       (define top (get-sym stk-ptr))
+       (set! stk-ptr (+ 1 stk-ptr))
+       (define tl (get-sym stk-ptr))
+       (set! stk-ptr (+ 1 stk-ptr))
+       (define fl (get-sym stk-ptr))
+       (set! stk-ptr (+ 1 stk-ptr))
+       (add-inst (list 'label top) acc)
+       (define bs (eval-bexp bexp))
+       (add-inst (list 'branch bs tl) acc)
+       (add-inst (list 'jump fl) acc)
+       (add-inst (list 'label tl) acc)
+       (compile-h bdy)
+       (add-inst (list 'jump top) acc)
+       (add-inst (list 'label fl) acc)]
+      [`(seq ...)
+       (compile-h (rest (first prog)))])])
     (compile-h (rest prog))]
     ))
   (compile-h prog)
