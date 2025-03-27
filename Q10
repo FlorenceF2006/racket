@@ -4,7 +4,7 @@
 ;;first attempt: using lists as stacks for each function application
 
 
-(struct fn-toekn (name argnum))
+(struct fn-token (name argnum))
 
 ;;add a global const to data in compile-simpl
 ;;(const NULL 0)
@@ -51,16 +51,16 @@
   ;; this instruction needed to be added to the front of A-PRIMPL program so that it
   ;; jump to eval main function first
   (define fst-inst '((jump main)))
-
-  (define args (rest (second function)))
-  (define fun-nm (first (second function)))
-  (define fun-arg# (- (length (second function)) 1))
+  
+  (define (args function) (rest (second function)))
+  (define (fun-nm function) (first (second function)))
+  (define (fun-arg# function) (- (length (second function)) 1))
   ;;fn-name-fetch: (listof fun) -> (listof fn-token)
   (define (fn-fetch program)
     (define (fn-fetch-h program acc)
       (if (empty? program)
           acc
-          (fn-fetch-h (rest progarm)
+          (fn-fetch-h (rest program)
                       (cons (fn-token (fun-nm (first program))
                                       (fun-arg# (first program)))
                             acc))))
