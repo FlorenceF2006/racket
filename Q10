@@ -4,6 +4,8 @@
 ;;first attempt: using lists as stacks for each function application
 
 
+(struct fn-toekn (name argnum))
+
 ;;add a global const to data in compile-simpl
 ;;(const NULL 0)
 
@@ -46,9 +48,29 @@
 ;;(listof functions -> listof instruction)
 ;;(fun (id ,,) (vars[] stmt))
 (define (compile-simpl program)
+  ;; this instruction needed to be added to the front of A-PRIMPL program so that it
+  ;; jump to eval main function first
+  (define fst-inst '((jump main)))
+
+  (define args (rest (second function)))
+  (define fun-nm (first (second function)))
+  (define fun-arg# (- (length (second function)) 1))
+  ;;fn-name-fetch: (listof fun) -> (listof fn-token)
+  (define (fn-fetch program)
+    (define (fn-fetch-h program acc)
+      (if (empty? program)
+          acc
+          (fn-fetch-h (rest progarm)
+                      (cons (fn-token (fun-nm (first program))
+                                      (fun-arg# (first program)))
+                            acc))))
+    (fn-fetch-h program empty))
+
+  ;; funlist creates a table to check if the is defined in the given SIMPL
+  (define funlist (fn-fetch program))
+
   ;;function -> listof instruction
   (define (compile-fun function)
-
     ;;three helper functions are just here to add instructions
     (define data empty)
     (define inst empty)
@@ -56,9 +78,7 @@
       (set! data (append data (list lst))))
     (define (add-inst lst)
       (set! inst (append inst (list lst))))
-    ;;two fixed parameters can be immediately read in
-    (define args (rest (second function)))
-    (define fun-nm (first (second function)))
+
     (define fun-inst (rest (rest (third function))))
     ;;define a counter for our function temp vars
     (define ctr 0)
@@ -77,20 +97,16 @@
     (define return-value (return-val fun-nm))
     (define return-address (return-addr fun-nm))
     (add-data (list 'data return-value 'NULL))
-    (add-data (list 'data return-address 'NULL))
-    
-    
-         
-         
-    
-    
-    
-    
-    
-    
+    (add-data (list 'data return-address 'NULL)))
 
-     
-)
+  ;; compile-simpl-h: final job
+  (define (compile-simpl-h program acc)
+    (if (empty? program)
+        (append fst-inst acc)
+        (compile-simpl-h (rest program)
+                         (append acc (compile-fun (first program))))))
+  
+  (compile-simple-h program empty)
   )
 
        
