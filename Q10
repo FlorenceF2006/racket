@@ -9,7 +9,222 @@
 ;;add a global const to data in compile-simpl
 ;;(const NULL 0)
 
+;;need a global map that contains the name of all #lang racket
+;;Fee Chen, Florence Fan
+;;question is why I need stack and how do I implement stack?
+;;first attempt: using lists as stacks for each function application
+
+
+
+
+;;add a global const to data in compile-simpl
+;;(const NULL 0)
+(struct fn-token (id tkn-arg tkn-var))
 ;;need a global map that contains the name of all functions, and their argument name.
+(define dict-fun empty)
+(define (lookup dict fun)
+  (cond[(empty? dict) (error "undefined function")]
+       [(equal? (first (first dict)) fun) (first dict)]
+       [else (lookup (rest dict) fun)]))
+
+
+
+(define (return-addr nm)
+  (string->symbol (string-append "_RETURN_ADDR_" (symbol->string nm))))
+(define (return-val nm)
+  (string->symbol (string-append "_RETURN_VALUE_" (symbol->string nm))))
+(define (arg arg-nm fun-nm)
+  (string->symbol (string-append "_ARG_" (symbol->string fun-nm) "_" (symbol->string arg-nm))))
+(define (var var-nm fun-nm)
+  (string->symbol (string-append "_VAR_" (symbol->string fun-nm) "_" (symbol->string var-nm))))
+(define (op-trans op)
+  (match op
+    ['+ 'add]
+    ['* 'mul]
+    ['- 'sub]
+    ['div 'div]
+    ['mod 'mod]
+    ['= 'equal]
+    ['> 'gt]
+    ['< 'lt]
+    ['>= 'ge]
+    ['<= 'le]
+    ['not 'lnot]
+    ['and 'land]
+    ['or 'lor]
+    ))
+
+
+;;every thing should be rewritten
+;;(listof functions -> listof instruction)
+;;(fun (id ,,) (vars[] stmt))
+(define (compile-simpl program)
+  ;; this instruction needed to be added to the front of A-PRIMPL program so that it
+  ;; jump to eval main function first
+  (define fst-inst '((jump main)))
+  
+  (define (args function) (rest (second function)))
+  (define (fun-nm function) (first (second function)))
+  (define (fun-arg# function) (- (length (second function)) 1))
+  ;;fn-name-fetch: (listof fun) -> (listof fn-token)
+  ;;(fun (id id ..) (vars [(id int) ...] stmt ...))
+  (define (fn-fetch prog)
+    (define (fn-fetch-h prog acc)
+      (cond[(empty? prog) acc]
+           [else
+            (define fun (first prog))
+            (define fun-nm (first (second fun)))
+            (define fun-args (rest (second fun)))
+            (define var-args (map first (second (third fun))))
+            (define var-val (map second (second (third fun))))
+            (fn-fetch-h (rest prog) (cons (fm-token fun-nm (append fun-args var-args) var-val) acc))]          
+          
+    ))
+    (fn-fetch-h prog empty))
+
+  ;; funlist creates a table to check if the is defined in the given SIMPL
+  (define funlist (fn-fetch program))
+
+  ;;function -> listof instruction
+  (define (compile-fun function)
+    ;;three helper functions are just here to add instructions
+    (define data empty)
+    (define inst empty)
+    (define (add-data lst)
+      (set! data (append data (list lst))))
+    (define (add-inst lst)
+      (set! inst (append inst (list lst))))
+
+    (define fun-inst (rest (rest (third function))))
+    ;;define a counter for our function temp vars
+    (define ctr 0)
+    (define (get-sym num)
+      (var (string->symbol (number->string num)) fun-nm))
+    (define (incr-ctr n)
+      (set! ctr (+ ctr n)))
+    
+    (define (init-stk lst)
+      (cond[(empty? lst) void]
+           [(match (first lst)
+              [`nm
+               (add-data (list 'data (arg nm fun-nm) 'NULL))
+               (init-stk (rest lst))])]))
+    
+    (define return-value (return-val fun-nm))
+    (define return-address (return-addr fun-nm))
+    (add-data (list 'data return-value 'NULL))
+    (add-data (list 'data return-address 'NULL))
+(define (eval-aexp aexp)
+      (define (load-args fun-args args-val id)
+        (add-inst (list 'add fp fp 1))
+        (add-inst (list 'move (stack fp) (return-addr id)))
+        (cond[(empty? fun-args) void]
+             [else
+              (add-inst (list 'add fp fp 1))
+              (add-inst (list 'move (stack fp) (arg (first fun-args) id)))
+              (define new_arg (eval-aexp-h (first args-val)))
+              (add-inst (list 'move (arg (first fun-args) id) new_arg))]))
+      (define (unload-args fun-args id)
+        (add-inst (list 'move (return-addr id) (stack fp)))
+        (add-inst (list 'sub fp fp 1))
+        (cond[(empty? fun-args) void]
+             [else
+              (add-inst (list 'move (stack fp) (arg (first fun-args) id)))
+              (add-inst (list 'sub fp fp 1))]))
+        
+                                                                     
+      (define (eval-aexp-h aexp)
+        (match aexp
+        [`(,op,aexp1,aexp2)
+         (set! aexp1 (eval-aexp-h aexp1))
+         (set! aexp2 (eval-aexp-h aexp2))
+         (set! op (op-trans op))
+         (define pys (get-sym ctr))
+         (incr-ctr 1)
+         (add-data (list 'data pys 'NULL))
+         (add-inst (list op pys aexp1 aexp2))
+         pys]
+        [`(,id ...)
+         (define fun-args (lookup dict-fun id))
+         (load-args fun-args (rest aexp) id)
+         (add-inst (list 'jsr (return-addr id) (start id)))
+         (unload-args fun-args id)
+         (define pys (get-sym ctr))
+         (incr-ctr 1)
+         (add-data (list 'data pys 'NULL))
+         (add-inst (list 'move pys (return-val id)))
+         pys]
+        [`,x (if (number? x) x (arg x fun-nm))
+           ])))
+)
+  
+
+
+  ;; compile-simpl-h: final job
+  (define (compile-simpl-h program acc)
+    (if (empty? program)
+        (append fst-inst acc)
+        (compile-simpl-h (rest program)
+                         (append acc (compile-fun (first program))))))
+  
+  (compile-simple-h program empty)
+  )
+
+       
+       
+       
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+             
+       
+       
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+             
+       
+       , and their argument name.
 (define dict-fun empty)
 (define (lookup dict fun)
   (cond[(empty? dict) (error "undefined function")]
