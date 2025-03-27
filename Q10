@@ -63,68 +63,23 @@
     ;;define a counter for our function temp vars
     (define ctr 0)
     (define (get-sym num)
-      (var (string->symbol (number->string num))))
+      (var (string->symbol (number->string num)) fun-nm))
     (define (incr-ctr n)
       (set! ctr (+ ctr n)))
-    ;; think about this: what is the difference between vars[()],fun(),
-    ;;what is the difference between the datas held by them.
-    ;;vars[()] hold local const. why? because this has to be initiate every
-    ;;separate function application.
-    ;;but argument can change depending on what you pass to them.
-    ;;modification or mutation to data in vars will not survive to the next time you call them.
-    ;;so if we want a list-based stack for data, don't do it to vars, do it to arguments.
-
-    ;;step1: "constify" all the values in var
-    (define (constify lst)
-      (cond[(empty? lst) empty]
-           [(match (first lst)
-              [`(,nm,val)
-               (cons (list 'const (var nm) val))])]))
-    ;;initially, data store all the constified const
-    (set! data (constify (second (third function))))
-    ;;then for every application: we want empty stack for every arg,return-val,return-addr
-    ;;therefore, let us initialize the stack(implemented in list) here when defining the function.
+    
     (define (init-stk lst)
-      (cond[(empty? lst) empty]
+      (cond[(empty? lst) void]
            [(match (first lst)
               [`nm
-               (cons (list 'data (arg nm) 'NULL) (init-stk (rest lst)))])]))
-    (add-data (init-stk args))
-    (define return-value (return-val nm))
-    (define return-address (return-addr nm))
+               (add-data (list 'data (arg nm fun-nm) 'NULL))
+               (init-stk (rest lst))])]))
+    
+    (define return-value (return-val fun-nm))
+    (define return-address (return-addr fun-nm))
     (add-data (list 'data return-value 'NULL))
     (add-data (list 'data return-address 'NULL))
-    ;;those datas are loaded before the function top label, which means function will
-    ;;only initiated those data once. In fact, all the data in "data" is initiated only once
-    ;;the problem I'm encountering right now is that (1) we don't know the name of argument stack
-    ;;(2) we need a function that gives us the top of such stack, and retrieve to previous one after
-    ;;using the top.
-    ;;
-    ;;aexp -> pys
-    (define (eval-aexp exp)
-      (define (load-arg val-lst arg-lst)
-        (cond[(empty? val-lst) void]
-             [else
-              (define xi (arg (first arg-lst)))
-              (define vi (first val-lst))
-              (add-inst (list 'move 
-
-
-              
-      (match exp
-        [`(op,exp1,exp2)
-         (set! op (op-trans op))
-         (set! exp1 (eval-aexp exp1))
-         (set! exp2 (eval-aexp exp2))
-         (define pys (get-sym  ctr))
-         (incr-ctr 1)
-         (add-inst (list op pys exp1 exp2))
-         (add-data (list 'data pys 0))
-         pys]
-        [`(,id ...)
-         (define psy (get-sym ctr))
-         (incr-ctr 1)
-         (
+    
+    
          
          
     
