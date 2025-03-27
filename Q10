@@ -97,7 +97,51 @@
     (define return-value (return-val fun-nm))
     (define return-address (return-addr fun-nm))
     (add-data (list 'data return-value 'NULL))
-    (add-data (list 'data return-address 'NULL)))
+    (add-data (list 'data return-address 'NULL))
+(define (eval-aexp aexp)
+      (define (load-args fun-args args-val id)
+        (add-inst (list 'add fp fp 1))
+        (add-inst (list 'move (stack fp) (return-addr id)))
+        (cond[(empty? fun-args) void]
+             [else
+              (add-inst (list 'add fp fp 1))
+              (add-inst (list 'move (stack fp) (arg (first fun-args) id)))
+              (define new_arg (eval-aexp-h (first args-val)))
+              (add-inst (list 'move (arg (first fun-args) id) new_arg))]))
+      (define (unload-args fun-args id)
+        (add-inst (list 'move (return-addr id) (stack fp)))
+        (add-inst (list 'sub fp fp 1))
+        (cond[(empty? fun-args) void]
+             [else
+              (add-inst (list 'move (stack fp) (arg (first fun-args) id)))
+              (add-inst (list 'sub fp fp 1))]))
+        
+                                                                     
+      (define (eval-aexp-h aexp)
+        (match aexp
+        [`(,op,aexp1,aexp2)
+         (set! aexp1 (eval-aexp-h aexp1))
+         (set! aexp2 (eval-aexp-h aexp2))
+         (set! op (op-trans op))
+         (define pys (get-sym ctr))
+         (incr-ctr 1)
+         (add-data (list 'data pys 'NULL))
+         (add-inst (list op pys aexp1 aexp2))
+         pys]
+        [`(,id ...)
+         (define fun-args (lookup dict-fun id))
+         (load-args fun-args (rest aexp) id)
+         (add-inst (list 'jsr (return-addr id) (start id)))
+         (unload-args fun-args id)
+         (define pys (get-sym ctr))
+         (incr-ctr 1)
+         (add-data (list 'data pys 'NULL))
+         (add-inst (list 'move pys (return-val id)))
+         pys]
+        [`,x (if (number? x) x (arg x fun-nm))
+           ])))
+)
+
 
   ;; compile-simpl-h: final job
   (define (compile-simpl-h program acc)
