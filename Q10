@@ -1,8 +1,29 @@
-;;Fee Chen, Florence Fan
 #lang racket
+;;Fee Chen, Florence Fan
+;;question is why I need stack and how do I implement stack?
+;;first attempt: using lists as stacks for each function application
 
-(define (compile-simpl program)
-  
+
+;;add a global const to data in compile-simpl
+;;(const NULL 0)
+
+;;need a global map that contains the name of all functions, and their argument name.
+(define dict-fun empty)
+(define (lookup dict fun)
+  (cond[(empty? dict) (error "undefined function")]
+       [(equal? (first (first dict)) fun) (first dict)]
+       [else (lookup (rest dict) fun)]))
+
+
+
+(define (return-addr nm)
+  (string->symbol (string-append "_RETURN_ADDR_" (symbol->string nm))))
+(define (return-val nm)
+  (string->symbol (string-append "_RETURN_VALUE_" (symbol->string nm))))
+(define (arg arg-nm fun-nm)
+  (string->symbol (string-append "_ARG_" (symbol->string fun-nm) "_" (symbol->string arg-nm))))
+(define (var var-nm fun-nm)
+  (string->symbol (string-append "_VAR_" (symbol->string fun-nm) "_" (symbol->string var-nm))))
 (define (op-trans op)
   (match op
     ['+ 'add]
@@ -19,152 +40,104 @@
     ['and 'land]
     ['or 'lor]
     ))
-;;
-;;assume we have a global counter : stk-ptr
-(define stk-ptr 0)
-;;assume we have a global accumulative data storage mem
-(define mem (box empty))
-;;get-sym returns the pysmbol with stk-ptr
-(define (get-sym ptr)
-  (string->symbol (string-append "_" (number->string ptr))))
 
-;; can you use + to coonect two symbols?
 
-(define (add-inst inst s)
-    (set-box! s (append (unbox s) (list inst))))
+;;every thing should be rewritten
+;;(listof functions -> listof instruction)
+;;(fun (id ,,) (vars[] stmt))
+(define (compile-simpl program)
+  ;;function -> listof instruction
+  (define (compile-fun function)
 
-(define acc (box empty))
+    ;;three helper functions are just here to add instructions
+    (define data empty)
+    (define inst empty)
+    (define (add-data lst)
+      (set! data (append data (list lst))))
+    (define (add-inst lst)
+      (set! inst (append inst (list lst))))
+    ;;two fixed parameters can be immediately read in
+    (define args (rest (second function)))
+    (define fun-nm (first (second function)))
+    (define fun-inst (rest (rest (third function))))
+    ;;define a counter for our function temp vars
+    (define ctr 0)
+    (define (get-sym num)
+      (var (string->symbol (number->string num))))
+    (define (incr-ctr n)
+      (set! ctr (+ ctr n)))
+    ;; think about this: what is the difference between vars[()],fun(),
+    ;;what is the difference between the datas held by them.
+    ;;vars[()] hold local const. why? because this has to be initiate every
+    ;;separate function application.
+    ;;but argument can change depending on what you pass to them.
+    ;;modification or mutation to data in vars will not survive to the next time you call them.
+    ;;so if we want a list-based stack for data, don't do it to vars, do it to arguments.
 
-;;what should it return?
-;;should it return a struct?
-;;or a list? I think it should return a list.
-;;we need a list of temporary data we can constantly cons.
-(define (eval-aexp exp)
-  ;;eval-h returns a pysymbol
-  (define (eval-h exp)
-    (match exp
-      [`(,ops ,exp1 ,exp2)
-       (define op (op-trans ops))
-       (define opd1 (eval-h exp1))
-       (define opd2 (eval-h exp2))
-       (define pys (get-sym stk-ptr))
-       (add-inst (list op pys opd1 opd2) acc)
-       (add-inst (list 'data pys 0) mem)
-       (set! stk-ptr (+ stk-ptr 1))
-       pys]
-      [x x]))
-  (eval-h exp)
-  )
+    ;;step1: "constify" all the values in var
+    (define (constify lst)
+      (cond[(empty? lst) empty]
+           [(match (first lst)
+              [`(,nm,val)
+               (cons (list 'const (var nm) val))])]))
+    ;;initially, data store all the constified const
+    (set! data (constify (second (third function))))
+    ;;then for every application: we want empty stack for every arg,return-val,return-addr
+    ;;therefore, let us initialize the stack(implemented in list) here when defining the function.
+    (define (init-stk lst)
+      (cond[(empty? lst) empty]
+           [(match (first lst)
+              [`nm
+               (cons (list 'data (arg nm) 'NULL) (init-stk (rest lst)))])]))
+    (add-data (init-stk args))
+    (define return-value (return-val nm))
+    (define return-address (return-addr nm))
+    (add-data (list 'data return-value 'NULL))
+    (add-data (list 'data return-address 'NULL))
+    ;;those datas are loaded before the function top label, which means function will
+    ;;only initiated those data once. In fact, all the data in "data" is initiated only once
+    ;;the problem I'm encountering right now is that (1) we don't know the name of argument stack
+    ;;(2) we need a function that gives us the top of such stack, and retrieve to previous one after
+    ;;using the top.
+    ;;
+    ;;aexp -> pys
+    (define (eval-aexp exp)
+      (define (load-arg val-lst arg-lst)
+        (cond[(empty? val-lst) void]
+             [else
+              (define xi (arg (first arg-lst)))
+              (define vi (first val-lst))
+              (add-inst (list 'move 
 
-(define (eval-bexp exp)
-  ;;eval-h: return a pysymbol
-  (define (eval-h lst op sym)
-    (cond[(empty? lst) void]
-         [else
-          (define cur (eval-bexp (first lst)))
-          (add-inst (list (op-trans op) sym cur sym) acc)
-          (eval-h (rest lst) op sym)]))
-  (match exp
-    [`(,op ,bexp1 ,bexp2)
-     (define val1 (eval-bexp bexp1))
-     (define val2 (eval-bexp bexp2))
-     (define psy (get-sym stk-ptr))
-     (set! stk-ptr (+ stk-ptr 1))
-     (add-inst (list (op-trans op) psy val1 val2) acc)
-     (add-inst (list  'data psy #f) mem)
-     psy]
-    [`(,op,bexp)
-     (define val (eval-bexp bexp))
-     (define psy (get-sym stk-ptr))
-     (set! stk-ptr (+ stk-ptr 1))
-     (add-inst (list (op-trans op) psy val) acc)
-     (add-inst (list 'data psy #f) mem) psy]
-    ['true #t]
-    ['false #f]
-    [x (cond[(not (list? x)) x]
-            [else (define psy (get-sym stk-ptr))
-       (set! stk-ptr (+ stk-ptr 1))
-       (if (equal? (first exp) 'and) (add-inst (list 'data psy #t) mem)
-           (add-inst (list 'data psy #f) mem))
-       (eval-h (rest exp) (first exp) psy) psy])])
-  )
 
-(define (to-imm x)
-  (match x
-    [`true #t]
-    [`false #f]
-    [_ x]))
-(define (convert-data lst)
-  (cond[(empty? lst) empty]
-       [else (cons (list 'data (first (first lst)) (to-imm (second (first lst))))
-                   (convert-data (rest lst)))
-                    ]))
+              
+      (match exp
+        [`(op,exp1,exp2)
+         (set! op (op-trans op))
+         (set! exp1 (eval-aexp exp1))
+         (set! exp2 (eval-aexp exp2))
+         (define pys (get-sym  ctr))
+         (incr-ctr 1)
+         (add-inst (list op pys exp1 exp2))
+         (add-data (list 'data pys 0))
+         pys]
+        [`(,id ...)
+         (define psy (get-sym ctr))
+         (incr-ctr 1)
+         (
+         
+         
+    
+    
+    
+    
+    
+    
 
-(define (compile prog)
-  (set-box! mem (convert-data (second prog)))
-  (set! prog (rest (rest prog)))
-  (define (compile-h prog)
-    (cond[ (empty? prog) void]
-    [else
-     (match (first prog)
-      [`(print ,exp)
-       (cond[(string? exp)
-             (add-inst (list 'print-string exp) acc)]
-            [else
-             (define pys (eval-aexp exp))
-             (add-inst (list 'print-val pys) acc)])]
-      [`(set ,id ,aexp)
-       (define pys (eval-aexp aexp))
-       (add-inst (list 'move id pys) acc)]
-      [`(iif ,bexp ,stmt1 ,stmt2)
-       (define bs (eval-bexp bexp))
-       (define tl (get-sym stk-ptr))
-       (set! stk-ptr (+ stk-ptr 1))
-       (define fl (get-sym stk-ptr))
-       (set! stk-ptr (+ stk-ptr 1))
-       (add-inst (list 'branch bs tl) acc)
-       (add-inst (list 'jump fl) acc)
-       (add-inst (list 'label tl) acc)
-       (compile-h (list stmt1))
-       (define nl (get-sym stk-ptr))
-       (set! stk-ptr (+ stk-ptr 1))
-       (add-inst (list 'jump nl) acc)
-       (add-inst (list 'label fl) acc)
-       (compile-h (list stmt2))
-       (add-inst (list 'label nl) acc)]
-      [`(skip) void]
-      [`(return,aexp)
-        (define res (eval-aexp aexp))
-        (add-inst (list '
-      [_
-
-       (cond[(equal? (first (first prog)) 'seq)
-             (compile-h (rest (first prog)))]
-            [else
-             (define loop (first prog))
-             (define bdy (rest (rest loop)))
-             (define bexp (second loop))
-             (define top (get-sym stk-ptr))
-             (set! stk-ptr (+ 1 stk-ptr))
-             (define tl (get-sym stk-ptr))
-             (set! stk-ptr (+ 1 stk-ptr))
-             (define fl (get-sym stk-ptr))
-             (set! stk-ptr (+ 1 stk-ptr))
-             (add-inst (list 'label top) acc)
-             (define bs (eval-bexp bexp))
-             (add-inst (list 'branch bs tl) acc)
-             (add-inst (list 'jump fl) acc)
-             (add-inst (list 'label tl) acc)
-             (compile-h bdy)
-             (add-inst (list 'jump top) acc)
-             (add-inst (list 'label fl) acc)])])
-    (compile-h (rest prog))]
-    ))
-  (compile-h prog)
-  (append (unbox acc) '((halt)) (unbox mem))
-  )
-(compile program)
+     
 )
+  )
+
        
        
        
@@ -176,6 +149,28 @@
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+             
+       
+       
 
 
 
