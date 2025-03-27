@@ -68,7 +68,7 @@
             (define var-val (map second (second (third fun))))
             (fn-fetch-h (rest prog) (cons (fm-token fun-nm (append fun-args var-args) var-val) acc))]          
           
-    ))
+           ))
     (fn-fetch-h prog empty))
 
   ;; funlist creates a table to check if the is defined in the given SIMPL
@@ -85,25 +85,32 @@
       (set! inst (append inst (list lst))))
 
     (define fun-inst (rest (rest (third function))))
+    (define name (first function))
     ;;define a counter for our function temp vars
     (define ctr 0)
     (define (get-sym num)
       (var (string->symbol (number->string num)) fun-nm))
     (define (incr-ctr n)
       (set! ctr (+ ctr n)))
-    
-    (define (init-stk lst)
+    ;;add arg and var into data list
+    (define (init-arg lst)
       (cond[(empty? lst) void]
-           [(match (first lst)
-              [`nm
-               (add-data (list 'data (arg nm fun-nm) 'NULL))
-               (init-stk (rest lst))])]))
+           [else (add-data (list 'data (first lst) 'NULL))
+                 (init-arg (rest lst))
+                 ]))
+    (define (init-var var-nm var-val)
+      (cond[(empty? lst) void]
+           [else (add-data (list 'data (first lst) (first var-val)))
+                 (init-var (rest var-nm) (rest var-val))]))
+    
+    
+    
     
     (define return-value (return-val fun-nm))
     (define return-address (return-addr fun-nm))
     (add-data (list 'data return-value 'NULL))
     (add-data (list 'data return-address 'NULL))
-(define (eval-aexp aexp)
+    (define (eval-aexp aexp)
       (define (load-args fun-args args-val id)
         (cond[(empty? fun-args) void]
              [else
@@ -126,34 +133,68 @@
                                                                      
       (define (eval-aexp-h aexp)
         (match aexp
-        [`(,op,aexp1,aexp2)
-         (set! aexp1 (eval-aexp-h aexp1))
-         (set! aexp2 (eval-aexp-h aexp2))
-         (set! op (op-trans op))
-         (define pys (get-sym ctr))
+          [`(,op,aexp1,aexp2)
+           (set! aexp1 (eval-aexp-h aexp1))
+           (set! aexp2 (eval-aexp-h aexp2))
+           (set! op (op-trans op))
+           (define pys (get-sym ctr))
+           (incr-ctr 1)
+           (add-data (list 'data pys 'NULL))
+           (add-inst (list op pys aexp1 aexp2))
+           pys]
+          [`(,id ...)
+           (define token (lookup dict-fun id))
+           (define fun-args (fn-token-tkn-args token))
+           (define var-val (fn-token-tkn-var token))
+           (define fun-val (append (rest aexp) var-val))
+           (if (= (length fun-val) (length fun-args)) void (error "arguments")) 
+           (add-inst (list 'add fp fp 1))
+           (add-inst (list 'move (list stack fp) (return-addr id)))
+           (load-args fun-args fun-val id)
+           (add-inst (list 'jsr (return-addr id) (start id)))
+           (unload-args fun-args id)
+           (define pys (get-sym ctr))
+           (incr-ctr 1)
+           (add-data (list 'data pys 'NULL))
+           (add-inst (list 'move pys (return-val id)))
+           pys]
+          [`,x (if (number? x) x (arg x fun-nm))
+               ])))
+    (define (eval-bexp exp)
+      ;;eval-h: return a pysymbol
+      (define (eval-h lst op sym)
+        (cond[(empty? lst) void]
+             [else
+              (define cur (eval-bexp (first lst)))
+              (add-inst (list (op-trans op) sym cur sym) acc)
+              (eval-h (rest lst) op sym)]))
+      (match exp
+        [`(,op ,bexp1 ,bexp2)
+         (define val1 (eval-bexp bexp1))
+         (define val2 (eval-bexp bexp2))
+         (define psy (get-sym ctr))
          (incr-ctr 1)
-         (add-data (list 'data pys 'NULL))
-         (add-inst (list op pys aexp1 aexp2))
-         pys]
-        [`(,id ...)
-         (define token (lookup dict-fun id))
-         (define fun-args (fn-token-tkn-args token))
-         (define var-val (fn-token-tkn-var token))
-         (define fun-val (append (rest aexp) var-val))
-         (if (= (length fun-val) (length fun-args)) void (error "arguments")) 
-         (add-inst (list 'add fp fp 1))
-         (add-inst (list 'move (list stack fp) (return-addr id)))
-         (load-args fun-args fun-val id)
-         (add-inst (list 'jsr (return-addr id) (start id)))
-         (unload-args fun-args id)
-         (define pys (get-sym ctr))
+         (add-inst (list (op-trans op) psy val1 val2) acc)
+         (add-inst (list  'data psy #f) mem)
+         psy]
+        [`(,op,bexp)
+         (define val (eval-bexp bexp))
+         (define psy (get-sym ctr))
          (incr-ctr 1)
-         (add-data (list 'data pys 'NULL))
-         (add-inst (list 'move pys (return-val id)))
-         pys]
-        [`,x (if (number? x) x (arg x fun-nm))
-           ])))
-)
+         (add-inst (list (op-trans op) psy val) acc)
+         (add-inst (list 'data psy #f) mem) psy]
+        ['true #t]
+        ['false #f]
+        [x (cond[(not (list? x)) x]
+                [else (define psy (get-sym ctr))
+                      (incr-ctr 1)
+                      (if (equal? (first exp) 'and) (add-inst (list 'data psy #t) mem)
+                          (add-inst (list 'data psy #f) mem))
+                      (eval-h (rest exp) (first exp) psy) psy])])
+      )
+    (define (compile-fun-h stmt)
+      (
+    )
   
 
 
@@ -220,5 +261,4 @@
 
 
              
-       
        
