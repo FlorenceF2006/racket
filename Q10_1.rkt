@@ -124,6 +124,9 @@
   (add-data (list 'data return-value 'NULL))
   (if (equal? name 'main) (add-data (list 'data return-address 'HALT)) (add-data (list 'data return-address 'NULL)))
   (define (eval-aexp aexp)
+    (define (reverse-list lst acc)
+      (cond[(empty? lst) acc]
+           [else (append acc (list (first lst)))]))
     (define (load-args fun-args args-val id)
       (cond[(empty? fun-args) void]
            [else
@@ -134,8 +137,6 @@
             (load-args (rest fun-args) (rest args-val) id)
             ]))
     (define (unload-args fun-args id)
-      (add-inst (list 'move (return-addr id) (list stack fp)))
-      (add-inst (list 'sub fp fp 1))
       (cond[(empty? fun-args) void]
            [else
             (add-inst (list 'move (arg (first fun-args) id) (list stack fp)))
@@ -167,7 +168,9 @@
          (add-inst (list 'move (list stack fp) (return-addr id)))
          (load-args fun-args fun-val id)
          (add-inst (list 'jsr (return-addr id) id))
-         (unload-args fun-args id)
+         (unload-args (reverse-list fun-args empty) id)
+         (add-inst (list 'move (return-addr id) (list stack fp)))
+         (add-inst (list 'sub fp fp 1))
          (define pys (get-sym ctr))
          (incr-ctr 1)
          (add-data (list 'data pys 'NULL))
@@ -286,7 +289,7 @@
                          (append acc (compile-fun (first program))))))
   
   (define res (compile-simpl-h program empty))
-  (if main? (set! res (cons (list 'jump 'main) res)) (set! res (cons '(halt) res)))
+  (if main? (set! res (cons (list 'jump 'main) res)) (set! res (cons '(jump HALT) res)))
   (set! res (append res (list (list 'const 'NULL 0))))
   (set! res (append res (list (list 'label 'HALT))))
   (set! res (append res (list (list 'halt))))
@@ -297,3 +300,15 @@
   
   ;; compile-simpl-h: final job
   )
+
+
+
+       
+       
+       
+  
+
+
+
+
+             
