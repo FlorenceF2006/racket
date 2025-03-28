@@ -1,7 +1,5 @@
 #lang racket
 ;;Fee Chen, Florence Fan
-;;question is why I need stack and how do I implement stack?
-;;first attempt: using lists as stacks for each function application
 
 
 
