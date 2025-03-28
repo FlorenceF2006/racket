@@ -66,7 +66,7 @@
             (define fun-args (rest (second fun)))
             (define var-args (map first (second (third fun))))
             (define var-val (map second (second (third fun))))
-            (fn-fetch-h (rest prog) (cons (fm-token fun-nm (append fun-args var-args) var-val) acc))]          
+            (fn-fetch-h (rest prog) (cons (fn-token fun-nm (append fun-args var-args) var-val) acc))]          
           
            ))
     (fn-fetch-h prog empty))
@@ -76,6 +76,10 @@
 
   ;;function -> listof instruction
   (define (compile-fun function)
+    (define name (first (second function)))
+    ;;we need a label for each function
+    (add-inst (list 'label name))
+    
     ;;three helper functions are just here to add instructions
     (define data empty)
     (define inst empty)
@@ -85,11 +89,10 @@
       (set! inst (append inst (list lst))))
 
     (define fun-inst (rest (rest (third function))))
-    (define name (first function))
     ;;define a counter for our function temp vars
     (define ctr 0)
     (define (get-sym num)
-      (var (string->symbol (number->string num)) fun-nm))
+      (var (string->symbol (number->string num)) name))
     (define (incr-ctr n)
       (set! ctr (+ ctr n)))
     ;;add arg and var into data list
@@ -99,12 +102,15 @@
                  (init-arg (rest lst))
                  ]))
     (define (init-var var-nm var-val)
-      (cond[(empty? lst) void]
+      (cond[(empty? var-nm) void]
            [else (add-data (list 'data (first lst) (first var-val)))
                  (init-var (rest var-nm) (rest var-val))]))
-    
-    
-    
+    (define fun-arg (rest (second rest)))
+    (define fun-var (map first (second (third function))))
+    (define fun-val (map second (second (third function))))
+    (init-arg fun-arg)
+    (init-var fun-var fun-val)
+
     
     (define return-value (return-val fun-nm))
     (define return-address (return-addr fun-nm))
@@ -160,13 +166,15 @@
            pys]
           [`,x (if (number? x) x (arg x fun-nm))
                ])))
+
+    
     (define (eval-bexp exp)
       ;;eval-h: return a pysymbol
       (define (eval-h lst op sym)
         (cond[(empty? lst) void]
              [else
               (define cur (eval-bexp (first lst)))
-              (add-inst (list (op-trans op) sym cur sym) acc)
+              (add-inst (list (op-trans op) sym cur sym))
               (eval-h (rest lst) op sym)]))
       (match exp
         [`(,op ,bexp1 ,bexp2)
@@ -174,30 +182,84 @@
          (define val2 (eval-bexp bexp2))
          (define psy (get-sym ctr))
          (incr-ctr 1)
-         (add-inst (list (op-trans op) psy val1 val2) acc)
-         (add-inst (list  'data psy #f) mem)
+         (add-inst (list (op-trans op) psy val1 val2))
+         (add-data (list 'data psy #f))
          psy]
         [`(,op,bexp)
          (define val (eval-bexp bexp))
          (define psy (get-sym ctr))
          (incr-ctr 1)
-         (add-inst (list (op-trans op) psy val) acc)
-         (add-inst (list 'data psy #f) mem) psy]
+         (add-inst (list (op-trans op) psy val))
+         (add-data (list 'data psy #f))
+         psy]
         ['true #t]
         ['false #f]
-        [x (cond[(not (list? x)) x]
+        [x (cond[(not (list? x)) (arg x fun-nm)]
                 [else (define psy (get-sym ctr))
                       (incr-ctr 1)
-                      (if (equal? (first exp) 'and) (add-inst (list 'data psy #t) mem)
-                          (add-inst (list 'data psy #f) mem))
+                      (if (equal? (first exp) 'and) (add-data (list 'data psy #t))
+                          (add-data (list 'data psy #f)))
                       (eval-h (rest exp) (first exp) psy) psy])])
       )
-    (define (compile-fun-h stmt)
-      (
-    )
+    (define (compile-h stmt)
+      (cond [(empty? stmt) void]
+            [else
+             (match (first prog)
+               [`(print ,exp)
+                (cond[(string? exp)
+                      (add-inst (list 'print-string exp))]
+                     [else
+                      (define pys (eval-aexp exp))
+                      (add-inst (list 'print-val pys))])]
+               [`(set ,id ,aexp)
+                (define pys (eval-aexp aexp))
+                (add-inst (list 'move id pys))]
+               [`(iif ,bexp ,stmt1 ,stmt2)
+                (define bs (eval-bexp bexp))
+                (define tl (get-sym ctr))
+                (incr-ctr 1)
+                (define fl (get-sym ctr))
+                (incr-ctr 1)
+                (add-inst (list 'branch bs tl))
+                (add-inst (list 'jump fl))
+                (add-inst (list 'label tl))
+                (compile-h (list stmt1))
+                (define nl (get-sym ctr))
+                (incr-ctr 1)
+                (add-inst (list 'jump nl))
+                (add-inst (list 'label fl))
+                (compile-h (list stmt2))
+                (add-inst (list 'label nl))]
+               [`(skip) void]
+               [`(while ...)
+                (define loop (first prog))
+                (define bdy (rest (rest loop)))
+                (define bexp (second loop))
+                (define top (get-sym ctr))
+                (incr-ctr 1)
+                (define tl (get-sym ctr))
+                (incr-ctr 1)
+                (define fl (get-sym ctr))
+                (incr-ctr 1)
+                (add-inst (list 'label top))
+                (define bs (eval-bexp bexp))
+                (add-inst (list 'branch bs tl))
+                (add-inst (list 'jump fl))
+                (add-inst (list 'label tl))
+                (compile-h bdy)
+                (add-inst (list 'jump top))
+                (add-inst (list 'label fl))]
+               [`(seq ...)
+                (compile-h (rest (first prog)))]
+               [`(return aexp)
+                (define result (eval-aexp aexp))
+                (add-inst (list 'move (return-val name) result))
+                (add-inst (list 'jump (return-addr name)))])])
+      (compile-h (rest stmt)))
+    (compile-h fun-inst)
+    (append inst data))
   
-
-
+  
   ;; compile-simpl-h: final job
   (define (compile-simpl-h program acc)
     (if (empty? program)
@@ -216,49 +278,4 @@
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
              
-       
-       
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-             
-       
